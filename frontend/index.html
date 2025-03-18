@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="fr">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Système Multi-Agents Chat</title>
+        <link rel="stylesheet" href="styles.css" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+        />
+    </head>
+    <body>
+        <div class="container">
+            <header>
+                <h1>Système Multi-Agents</h1>
+                <div class="status-indicator" id="connection-status">
+                    <span class="status-icon disconnected"
+                        ><i class="fas fa-circle"></i
+                    ></span>
+                    <span class="status-text">Déconnecté</span>
+                </div>
+            </header>
+
+            <main>
+                <div class="agents-panel">
+                    <h2>Agents</h2>
+                    <div class="agent-card">
+                        <div class="agent-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <div class="agent-info">
+                            <h3>Researcher</h3>
+                            <p>Recherche des informations précises</p>
+                        </div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="agent-info">
+                            <h3>Analyst</h3>
+                            <p>Analyse les données et extrait des insights</p>
+                        </div>
+                    </div>
+                    <div class="agent-card">
+                        <div class="agent-icon"><i class="fas fa-pen"></i></div>
+                        <div class="agent-info">
+                            <h3>Writer</h3>
+                            <p>Communique clairement les résultats</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="chat-container">
+                    <div class="chat-messages" id="chat-messages">
+                        <div class="message system">
+                            <div class="message-content">
+                                <p>
+                                    Bienvenue dans le système multi-agents.
+                                    Posez votre question pour commencer.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="chat-input-container">
+                        <textarea
+                            id="message-input"
+                            placeholder="Tapez votre message ici..."
+                            rows="2"
+                        ></textarea>
+                        <button
+                            id="send-button"
+                            type="button"
+                            title="Envoyer le message"
+                            aria-label="Envoyer le message"
+                            disabled
+                        >
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            </main>
+
+            <div class="workflow-panel">
+                <h2>Flux de travail</h2>
+                <div class="workflow-container">
+                    <div class="workflow-step" id="workflow-step-1">
+                        <div class="step-number">1</div>
+                        <div class="step-info">
+                            <h3>Recherche</h3>
+                            <div class="step-status">En attente</div>
+                        </div>
+                    </div>
+                    <div class="connector"></div>
+                    <div class="workflow-step" id="workflow-step-2">
+                        <div class="step-number">2</div>
+                        <div class="step-info">
+                            <h3>Analyse</h3>
+                            <div class="step-status">En attente</div>
+                        </div>
+                    </div>
+                    <div class="connector"></div>
+                    <div class="workflow-step" id="workflow-step-3">
+                        <div class="step-number">3</div>
+                        <div class="step-info">
+                            <h3>Rédaction</h3>
+                            <div class="step-status">En attente</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="script.js"></script>
+    </body>
+</html>

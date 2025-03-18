@@ -1,0 +1,378 @@
+:root {
+    --primary-color: #4a6fa5;
+    --secondary-color: #6b8caf;
+    --accent-color: #ff7e5f;
+    --background-color: #f5f7fa;
+    --card-color: #ffffff;
+    --text-color: #333333;
+    --light-text: #777777;
+    --border-color: #e0e0e0;
+    --success-color: #4caf50;
+    --error-color: #f44336;
+    --warning-color: #ff9800;
+    --shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+    background-color: var(--background-color);
+    color: var(--text-color);
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 20px;
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas:
+        "header header"
+        "agents chat"
+        "workflow workflow";
+    gap: 20px;
+    height: 100vh;
+}
+
+header {
+    grid-area: header;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+h1,
+h2,
+h3 {
+    color: var(--primary-color);
+}
+
+.status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+}
+
+.status-icon {
+    font-size: 12px;
+}
+
+.status-icon.connected i {
+    color: var(--success-color);
+}
+
+.status-icon.disconnected i {
+    color: var(--error-color);
+}
+
+.status-icon.connecting i {
+    color: var(--warning-color);
+}
+
+main {
+    display: contents;
+}
+
+.agents-panel {
+    grid-area: agents;
+    background-color: var(--card-color);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+    overflow-y: auto;
+}
+
+.agent-card {
+    display: flex;
+    align-items: center;
+    padding: 15px;
+    margin-bottom: 15px;
+    background-color: var(--background-color);
+    border-radius: 8px;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.agent-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow);
+}
+
+.agent-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-size: 18px;
+}
+
+.agent-info h3 {
+    margin-bottom: 5px;
+    font-size: 16px;
+}
+
+.agent-info p {
+    font-size: 14px;
+    color: var(--light-text);
+}
+
+.chat-container {
+    grid-area: chat;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--card-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+}
+
+.chat-messages {
+    flex-grow: 1;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.message {
+    max-width: 80%;
+    padding: 12px 15px;
+    border-radius: 18px;
+    line-height: 1.5;
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.message.user {
+    align-self: flex-end;
+    background-color: var(--primary-color);
+    color: white;
+    border-bottom-right-radius: 5px;
+}
+
+.message.agent {
+    align-self: flex-start;
+    background-color: var(--secondary-color);
+    color: white;
+    border-bottom-left-radius: 5px;
+}
+
+.message.system {
+    align-self: center;
+    background-color: #f0f0f0;
+    color: var(--light-text);
+    border-radius: 12px;
+    font-style: italic;
+    text-align: center;
+    max-width: 90%;
+}
+
+.message-sender {
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 5px;
+}
+
+.message-content p {
+    margin-bottom: 8px;
+}
+
+.message-content p:last-child {
+    margin-bottom: 0;
+}
+
+.chat-input-container {
+    display: flex;
+    padding: 15px;
+    background-color: var(--background-color);
+    border-top: 1px solid var(--border-color);
+}
+
+#message-input {
+    flex-grow: 1;
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    padding: 12px 20px;
+    resize: none;
+    outline: none;
+    transition: border-color 0.3s;
+    font-size: 15px;
+}
+
+#message-input:focus {
+    border-color: var(--primary-color);
+}
+
+#send-button {
+    margin-left: 10px;
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background-color: var(--accent-color);
+    color: white;
+    border: none;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#send-button:enabled:hover {
+    background-color: #ff6347;
+    transform: scale(1.05);
+}
+
+#send-button:disabled {
+    background-color: var(--border-color);
+    cursor: not-allowed;
+}
+
+.workflow-panel {
+    grid-area: workflow;
+    background-color: var(--card-color);
+    border-radius: 10px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.workflow-container {
+    display: flex;
+    align-items: center;
+    margin-top: 15px;
+    padding: 10px 0;
+}
+
+.workflow-step {
+    display: flex;
+    align-items: center;
+    padding: 10px 15px;
+    background-color: var(--background-color);
+    border-radius: 8px;
+    transition: background-color 0.3s;
+}
+
+.workflow-step.active {
+    background-color: rgba(74, 111, 165, 0.1);
+    border: 1px solid var(--primary-color);
+}
+
+.workflow-step.completed {
+    background-color: rgba(76, 175, 80, 0.1);
+}
+
+.step-number {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 15px;
+    font-weight: bold;
+}
+
+.workflow-step.completed .step-number {
+    background-color: var(--success-color);
+}
+
+.step-info h3 {
+    font-size: 16px;
+    margin-bottom: 5px;
+}
+
+.step-status {
+    font-size: 14px;
+    color: var(--light-text);
+}
+
+.workflow-step.active .step-status {
+    color: var(--primary-color);
+    font-weight: 500;
+}
+
+.workflow-step.completed .step-status {
+    color: var(--success-color);
+}
+
+.connector {
+    flex-grow: 1;
+    height: 2px;
+    background-color: var(--border-color);
+    margin: 0 10px;
+}
+
+/* Responsive styles */
+@media (max-width: 992px) {
+    .container {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "header"
+            "chat"
+            "agents"
+            "workflow";
+    }
+
+    .agents-panel {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
+    }
+
+    .agent-card {
+        margin-bottom: 0;
+    }
+
+    .workflow-container {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .connector {
+        width: 2px;
+        height: 20px;
+        margin: 0;
+    }
+}
+
+@media (max-width: 576px) {
+    .agents-panel {
+        grid-template-columns: 1fr;
+    }
+
+    .container {
+        padding: 10px;
+    }
+
+    h1 {
+        font-size: 20px;
+    }
+}
