@@ -122,19 +122,21 @@ class CrewManager:
             analysis_task = Task(
                 description="Analyse des données recueillies",
                 agent=self.analyst,
-                expected_output="Liste d'insights clés et conclusions"
+                expected_output="Liste d'insights clés et conclusions",
+                context=[research_task]
             )
 
             writing_task = Task(
                 description="Rédaction de la réponse finale",
                 agent=self.writer,
-                expected_output="Réponse structurée en français"
+                expected_output="Réponse structurée en français",
+                context=[research_task, analysis_task]
             )
 
             self.crew.tasks = [research_task, analysis_task, writing_task]
             result = self.crew.kickoff()
             
-            return result
+            return f"Réponse finale :\n\n{result}"
 
         except Exception as e:
             logger.error(f"Erreur de traitement: {str(e)}")
