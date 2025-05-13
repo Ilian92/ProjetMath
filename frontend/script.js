@@ -157,32 +157,65 @@ function sendMessage() {
     }
 }
 
+// Fonction pour appliquer les changements de style dynamiquement
+function applyStyleChanges(styleChanges) {
+    if (!styleChanges) return;
+
+    // Créer ou récupérer l'élément de style dynamique
+    let styleElement = document.getElementById("dynamic-styles");
+    if (!styleElement) {
+        styleElement = document.createElement("style");
+        styleElement.id = "dynamic-styles";
+        document.head.appendChild(styleElement);
+    }
+
+    // Construire les règles CSS à partir des changements
+    let cssRules = "";
+    for (const selector in styleChanges) {
+        cssRules += `${selector} {\n`;
+        for (const property in styleChanges[selector]) {
+            cssRules += `  ${property}: ${styleChanges[selector][property]};\n`;
+        }
+        cssRules += "}\n";
+    }
+
+    // Appliquer les styles
+    styleElement.textContent = cssRules;
+}
+
 // Process incoming message from server
 function processIncomingMessage(data) {
     if (data.sender === "crew") {
-        // Extract agent parts from the message
-        const message = data.message;
+        // Gérer différents types de réponses
+        if (data.type === "style") {
+            // Appliquer les modifications de style
+            applyStyleChanges(data.style_changes);
+            addSystemMessage(`Style modifié: ${data.message}`);
+        } else {
+            // Message standard - traiter comme avant
+            const message = data.message;
 
-        // Simulate the workflow steps with delays
-        setTimeout(() => {
-            updateWorkflowStatus("research", "Complété");
-            updateWorkflowStep("research", "completed");
-            updateWorkflowStatus("analysis", "En cours");
-            updateWorkflowStep("analysis", "active");
-        }, 1000);
+            // Simuler les étapes du flux de travail avec des délais
+            setTimeout(() => {
+                updateWorkflowStatus("research", "Complété");
+                updateWorkflowStep("research", "completed");
+                updateWorkflowStatus("analysis", "En cours");
+                updateWorkflowStep("analysis", "active");
+            }, 1000);
 
-        setTimeout(() => {
-            updateWorkflowStatus("analysis", "Complété");
-            updateWorkflowStep("analysis", "completed");
-            updateWorkflowStatus("writing", "En cours");
-            updateWorkflowStep("writing", "active");
-        }, 2000);
+            setTimeout(() => {
+                updateWorkflowStatus("analysis", "Complété");
+                updateWorkflowStep("analysis", "completed");
+                updateWorkflowStatus("writing", "En cours");
+                updateWorkflowStep("writing", "active");
+            }, 2000);
 
-        setTimeout(() => {
-            updateWorkflowStatus("writing", "Complété");
-            updateWorkflowStep("writing", "completed");
-            addAgentMessage(message);
-        }, 3000);
+            setTimeout(() => {
+                updateWorkflowStatus("writing", "Complété");
+                updateWorkflowStep("writing", "completed");
+                addAgentMessage(message);
+            }, 3000);
+        }
     }
 }
 
