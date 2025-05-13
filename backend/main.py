@@ -68,6 +68,24 @@ class CrewManager:
     def __init__(self):
         try:
             # Définition des agents
+            self.router = Agent(
+                role='Routeur',
+                goal='Analyser la requête et déterminer quel agent doit intervenir',
+                backstory='Expert en compréhension des requêtes utilisateur et en prise de décision',
+                llm=llm_config,
+                verbose=True,
+                allow_delegation=True
+            )
+            
+            self.stylist = Agent(
+                role='Styliste',
+                goal='Modifier le style visuel de l\'interface',
+                backstory='Designer UI/UX spécialisé dans la personnalisation d\'interfaces',
+                llm=llm_config,
+                verbose=True,
+                allow_delegation=False
+            )
+            
             self.researcher = Agent(
                 role='Chercheur',
                 goal='Trouver des informations précises et vérifiées',
@@ -95,12 +113,13 @@ class CrewManager:
                 allow_delegation=False
             )
 
-            # Configuration de l'équipe
+            # Configuration de l'équipe avec Process.graph au lieu de sequential
             self.crew = Crew(
-                agents=[self.researcher, self.analyst, self.writer],
+                agents=[self.stylist, self.researcher, self.analyst, self.writer],
                 tasks=[],
                 verbose=True,
-                process=Process.sequential
+                process=Process.hierarchical,
+                manager_agent=self.router
             )
             logger.info("Agents CrewAI initialisés avec succès")
 
@@ -111,36 +130,111 @@ class CrewManager:
     async def process_message(self, message: str) -> str:
         try:
             logger.info(f"Traitement du message: {message[:50]}...")
-
-            # Création des tâches
-            research_task = Task(
-                description=f"Recherche sur : {message}",
-                agent=self.researcher,
-                expected_output="Rapport détaillé avec sources fiables"
+            # Étape de routage pour déterminer le workflow
+            routing_task = Task(
+                description=f"Analyze cette requête utilisateur et détermine quel type de traitement est nécessaire: '{message}'. "
+                            f"Si c'est une demande de recherche d'information, réponds avec le JSON: "
+                            f"{{\"type\":\"recherche\",\"query\":\"<la requête>\"}}"
+                            f"Si c'est une demande de modification de style, réponds avec le JSON: "
+                            f"{{\"type\":\"style\",\"instructions\":\"<détails des changements>\",\"elements\":\"<éléments à modifier>\"}}",
+                agent=self.router,
+                expected_output="JSON avec le type de requête et les détails pertinents"
             )
-
-            analysis_task = Task(
-                description="Analyse des données recueillies",
-                agent=self.analyst,
-                expected_output="Liste d'insights clés et conclusions",
-                context=[research_task]
-            )
-
-            writing_task = Task(
-                description="Rédaction de la réponse finale",
-                agent=self.writer,
-                expected_output="Réponse structurée en français",
-                context=[research_task, analysis_task]
-            )
-
-            self.crew.tasks = [research_task, analysis_task, writing_task]
-            result = self.crew.kickoff()
-            
-            return f"Réponse finale :\n\n{result}"
-
+            # Exécuter la tâche de routage
+            routing_result = await self._run_task(routing_task)
+            try:
+                # Parser la réponse JSON du routeur
+                route_data = json.loads(routing_result)
+                task_type = route_data.get("type", "").lower()
+                if task_type == "style":
+                    # Workflow pour les modifications de style
+                    style_task = Task(
+                        description=f"Génère les modifications CSS pour: {route_data.get('instructions')}. "
+                                   f"Éléments à modifier: {route_data.get('elements')}",
+                        agent=self.stylist,
+                        expected_output="JSON avec les propriétés CSS à modifier et leurs valeurs"
+                    )
+                    result = await self._run_task(style_task)
+                    return json.dumps({
+                        "type": "style",
+                        "message": f"Modifications de style générées",
+                        "style_changes": json.loads(result) if isinstance(result, str) else result
+                    })
+                else:  # Par défaut, workflow de recherche
+                    # Création des tâches pour le chemin de recherche
+                    research_task = Task(
+                        description=f"Recherche sur : {message}",
+                        agent=self.researcher,
+                        expected_output="Rapport détaillé avec sources fiables"
+                    )
+                    analysis_task = Task(
+                        description="Analyse des données recueillies",
+                        agent=self.analyst,
+                        expected_output="Liste d'insights clés et conclusions",
+                        context=[research_task]  # Dépend des résultats de recherche
+                    )
+                    writing_task = Task(
+                        description="Rédaction de la réponse finale",
+                        agent=self.writer,
+                        expected_output="Réponse structurée en français",
+                        context=[analysis_task]  # Dépend de l'analyse
+                    )
+                    # Configuration des tâches et exécution
+                    self.crew.tasks = [research_task, analysis_task, writing_task]
+                    result = await self._run_crew()
+                    return json.dumps({
+                        "type": "recherche", 
+                        "message": result
+                    })
+            except json.JSONDecodeError:
+                # En cas d'erreur dans le parsing JSON, utiliser le flux de travail de recherche par défaut
+                logger.warning(f"Format de réponse du routeur incorrect: {routing_result}")
+                # Workflow de secours
+                research_task = Task(
+                    description=f"Recherche sur : {message}",
+                    agent=self.researcher,
+                    expected_output="Rapport détaillé"
+                )
+                self.crew.tasks = [research_task]
+                result = await self._run_crew()
+                return f"Réponse finale (mode secours) :\n\n{result}"
         except Exception as e:
             logger.error(f"Erreur de traitement: {str(e)}")
             return f"Erreur : {str(e)}"
+
+    # Méthodes auxiliaires pour exécution asynchrone
+    async def _run_task(self, task: Task) -> str:
+        # Créer un équipage temporaire avec uniquement cette tâche
+        temp_crew = Crew(
+            agents=[task.agent],
+            tasks=[task],
+            verbose=True
+        )
+    
+        # Exécuter l'équipage temporaire de manière non-bloquante
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, temp_crew.kickoff)
+    
+        # Extraire le texte du résultat (CrewOutput)
+        if hasattr(result, 'final_output'):
+            return result.final_output
+        elif hasattr(result, 'raw_output'):
+            return result.raw_output
+        else:
+            return str(result)  # Fallback pour les autres cas
+    
+    async def _run_crew(self) -> str:
+        # Cette méthode exécute le crew complet de manière non-bloquante
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, self.crew.kickoff)
+    
+        # Extraire le texte du résultat (CrewOutput)
+        if hasattr(result, 'final_output'):
+            return result.final_output
+        elif hasattr(result, 'raw_output'):
+            return result.raw_output
+        else:
+            return str(result)  # Fallback pour les autres cas
 
 # Initialisation
 crew_manager = CrewManager()
@@ -166,10 +260,37 @@ async def websocket_endpoint(websocket: WebSocket):
             
             response = await crew_manager.process_message(user_message)
             
-            await manager.send_personal_message(
-                json.dumps({"sender": "crew", "message": response}),
-                websocket
-            )
+            # Analyser si la réponse est une modification de style ou une réponse textuelle
+            try:
+                response_data = json.loads(response)
+                
+                if response_data.get("type") == "style":
+                    # Envoyer les modifications de style
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "sender": "crew", 
+                            "type": "style",
+                            "message": response_data.get("message", ""),
+                            "style_changes": response_data.get("style_changes", {})
+                        }),
+                        websocket
+                    )
+                else:
+                    # Envoyer la réponse textuelle
+                    await manager.send_personal_message(
+                        json.dumps({
+                            "sender": "crew", 
+                            "type": "message",
+                            "message": response_data.get("message", "")
+                        }),
+                        websocket
+                    )
+            except json.JSONDecodeError:
+                # Fallback si la réponse n'est pas en JSON
+                await manager.send_personal_message(
+                    json.dumps({"sender": "crew", "type": "message", "message": response}),
+                    websocket
+                )
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
