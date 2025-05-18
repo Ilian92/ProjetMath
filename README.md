@@ -2,6 +2,12 @@
 
 ## Lancement du projet
 
+Créer un environnement python si ce n'est pas déjà fait:
+
+```
+python3.12 -m venv venv
+```
+
 Accéder à l'environnement Python:
 
 ```

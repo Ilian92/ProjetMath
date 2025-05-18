@@ -7,6 +7,7 @@ import json
 import asyncio
 import logging
 import os
+import re
 from crewai import Agent, Task, Crew, Process, LLM
 from dotenv import load_dotenv
 
@@ -68,140 +69,152 @@ manager = ConnectionManager()
 class CrewManager:
     def __init__(self):
         try:
-            # Définition des agents
-            self.router = Agent(
-                role='Routeur',
-                goal='Analyser la requête et déterminer quel agent doit intervenir',
-                backstory='Expert en compréhension des requêtes utilisateur et en prise de décision',
-                llm=llm_config,
-                verbose=True,
-                allow_delegation=True
-            )
+            # Définition des agents (SANS LE ROUTEUR)
             
             self.stylist = Agent(
-                role='Styliste',
-                goal='Modifier le style visuel de l\'interface',
-                backstory='Designer UI/UX spécialisé dans la personnalisation d\'interfaces',
-                llm=llm_config,
+                role='Styliste CSS Expert',
+                goal='Générer du code CSS valide basé sur des instructions pour modifier le style visuel de l\'interface. La réponse DOIT être UNIQUEMENT un objet JSON valide.',
+                backstory='Designer UI/UX expert en CSS, spécialisé dans la traduction de demandes en code CSS précis et valide, retourné exclusivement en format JSON. Exemple de sortie : {"body": {"background-color": "red"}}',
+                llm=llm_config, # Assurez-vous que get_llm_config() est défini et fonctionnel
                 verbose=True,
                 allow_delegation=False
             )
             
             self.researcher = Agent(
-                role='Chercheur',
-                goal='Trouver des informations précises et vérifiées',
-                backstory='Expert en recherche avec accès aux bases de données scientifiques',
+                role='Chercheur Principal',
+                goal='Trouver des informations précises, vérifiées et détaillées sur un sujet donné, en fournissant des sources lorsque pertinent.',
+                backstory='Expert en recherche documentaire approfondie, capable de synthétiser des informations complexes issues de sources multiples et fiables.',
                 llm=llm_config,
                 verbose=True,
-                allow_delegation=False
+                allow_delegation=False 
             )
 
             self.analyst = Agent(
-                role='Analyste',
-                goal='Analyser les données et identifier les insights clés',
-                backstory='Spécialiste en analyse de données complexes',
+                role='Analyste de Données Senior',
+                goal='Analyser en profondeur les informations et données pour en extraire des insights clés, des tendances et des conclusions pertinentes.',
+                backstory='Spécialiste en analyse de données, transformant des informations brutes en interprétations claires et actionnables.',
                 llm=llm_config,
                 verbose=True,
                 allow_delegation=False
             )
-
+            
             self.writer = Agent(
-                role='Rédacteur',
-                goal='Produire une réponse claire et structurée',
-                backstory='Rédacteur technique expérimenté',
+                role='Rédacteur Technique en Chef',
+                goal='Produire une réponse finale claire, concise, structurée et bien argumentée, basée sur les informations et analyses fournies.',
+                backstory='Rédacteur technique expérimenté, maître dans l\'art de communiquer des informations complexes de manière accessible et engageante.',
                 llm=llm_config,
                 verbose=True,
                 allow_delegation=False
             )
 
-            # Configuration de l'équipe avec Process.graph au lieu de sequential
+            # Crew principal pour la recherche (sans manager_agent)
             self.crew = Crew(
-                agents=[self.stylist, self.researcher, self.analyst, self.writer],
-                tasks=[],
+                agents=[self.researcher, self.analyst, self.writer], # Le styliste est utilisé séparément
+                tasks=[], 
                 verbose=True,
-                process=Process.hierarchical,
-                manager_agent=self.router
+                process=Process.sequential # Traitement séquentiel pour le workflow de recherche
             )
-            logger.info("Agents CrewAI initialisés avec succès")
-
+            logger.info("Agents CrewAI (sans routeur) initialisés avec succès")
         except Exception as e:
-            logger.error(f"Erreur d'initialisation: {str(e)}")
+            logger.error(f"Erreur d'initialisation des agents CrewAI: {e}", exc_info=True)
             raise
 
     async def process_message(self, message: str) -> str:
         try:
-            logger.info(f"Traitement du message: {message[:50]}...")
-            # Étape de routage pour déterminer le workflow
-            routing_task = Task(
-                description=f"Analyze cette requête utilisateur et détermine quel type de traitement est nécessaire: '{message}'. "
-                            f"Si c'est une demande de recherche d'information, réponds avec le JSON: "
-                            f"{{\"type\":\"recherche\",\"query\":\"<la requête>\"}}"
-                            f"Si c'est une demande de modification de style, réponds avec le JSON: "
-                            f"{{\"type\":\"style\",\"instructions\":\"<détails des changements>\",\"elements\":\"<éléments à modifier>\"}}",
-                agent=self.router,
-                expected_output="JSON avec le type de requête et les détails pertinents"
-            )
-            # Exécuter la tâche de routage
-            routing_result = await self._run_task(routing_task)
-            try:
-                # Parser la réponse JSON du routeur
-                route_data = json.loads(routing_result)
-                task_type = route_data.get("type", "").lower()
-                if task_type == "style":
-                    # Workflow pour les modifications de style
-                    style_task = Task(
-                        description=f"Génère les modifications CSS pour: {route_data.get('instructions')}. "
-                                   f"Éléments à modifier: {route_data.get('elements')}",
-                        agent=self.stylist,
-                        expected_output="JSON avec les propriétés CSS à modifier et leurs valeurs"
-                    )
-                    result = await self._run_task(style_task)
-                    return json.dumps({
-                        "type": "style",
-                        "message": f"Modifications de style générées",
-                        "style_changes": json.loads(result) if isinstance(result, str) else result
-                    })
-                else:  # Par défaut, workflow de recherche
-                    # Création des tâches pour le chemin de recherche
-                    research_task = Task(
-                        description=f"Recherche sur : {message}",
-                        agent=self.researcher,
-                        expected_output="Rapport détaillé avec sources fiables"
-                    )
-                    analysis_task = Task(
-                        description="Analyse des données recueillies",
-                        agent=self.analyst,
-                        expected_output="Liste d'insights clés et conclusions",
-                        context=[research_task]  # Dépend des résultats de recherche
-                    )
-                    writing_task = Task(
-                        description="Rédaction de la réponse finale",
-                        agent=self.writer,
-                        expected_output="Réponse structurée en français",
-                        context=[analysis_task]  # Dépend de l'analyse
-                    )
-                    # Configuration des tâches et exécution
-                    self.crew.tasks = [research_task, analysis_task, writing_task]
-                    result = await self._run_crew()
-                    return json.dumps({
-                        "type": "recherche", 
-                        "message": result
-                    })
-            except json.JSONDecodeError:
-                # En cas d'erreur dans le parsing JSON, utiliser le flux de travail de recherche par défaut
-                logger.warning(f"Format de réponse du routeur incorrect: {routing_result}")
-                # Workflow de secours
-                research_task = Task(
-                    description=f"Recherche sur : {message}",
-                    agent=self.researcher,
-                    expected_output="Rapport détaillé"
+            logger.info(f"Traitement du message: {message[:70]}...")
+            task_type = ""
+
+            # Routage simplifié par heuristique sur des mots-clés
+            style_keywords = ['couleur', 'color', 'style', 'fond', 'arrière-plan', 'background', 'css', 'modifier l\'apparence', 'changer le look']
+            if any(keyword in message.lower() for keyword in style_keywords):
+                task_type = "style"
+            else:
+                task_type = "recherche"
+
+            if task_type == "style":
+                logger.info("Déclenchement du workflow de style")
+                
+                style_task = Task(
+                    description=f"Génère les modifications CSS pour la demande utilisateur : '{message}'. "
+                                "La réponse DOIT être UNIQUEMENT un objet JSON valide contenant les sélecteurs CSS comme clés et un objet de propriétés CSS comme valeurs. "
+                                "Par exemple : {\"body\": {\"background-color\": \"red\"}, \"h1\": {\"color\": \"blue\"}}. N'ajoute aucun texte explicatif en dehors du JSON.",
+                    agent=self.stylist,
+                    expected_output="Un objet JSON valide unique avec les modifications CSS."
                 )
-                self.crew.tasks = [research_task]
-                result = await self._run_crew()
-                return f"Réponse finale (mode secours) :\n\n{result}"
+                
+                style_result_str = await self._run_task(style_task) # _run_task exécute une tâche avec un agent
+                
+                style_changes_json = {}
+                raw_agent_output_for_error_log = style_result_str # Conserver la sortie brute originale pour les logs d'erreur
+
+                try:
+                    # Tentative 1: Essayer de parser directement la sortie de l'agent (après un strip simple)
+                    # Cela peut fonctionner si l'agent retourne du JSON pur.
+                    json_str_attempt1 = style_result_str.strip()
+                    logger.info(f"Attempt 1: Direct parse of stripped agent output: >>>{json_str_attempt1}<<<")
+                    logger.info(f"repr(json_str_attempt1): {repr(json_str_attempt1)}")
+                    style_changes_json = json.loads(json_str_attempt1)
+                    logger.info("Attempt 1: Direct parse successful.")
+
+                except json.JSONDecodeError as e1:
+                    logger.warning(f"Attempt 1 (direct parse) failed: {e1}. Proceeding to regex extraction.")
+                    
+                    # Tentative 2: Utiliser l'extraction par regex (votre méthode originale)
+                    # Cela est utile si le JSON est enrobé de texte ou de démarqueurs de code.
+                    match = re.search(r'(\{[\s\S]*?\})', style_result_str) # Utiliser style_result_str original pour le regex
+                    if match:
+                        json_str_attempt2_regex = match.group(1)
+                        logger.info(f"Attempt 2: Regex extracted json_str: >>>{json_str_attempt2_regex}<<<")
+                        logger.info(f"repr(json_str_attempt2_regex): {repr(json_str_attempt2_regex)}")
+                        try:
+                            style_changes_json = json.loads(json_str_attempt2_regex)
+                            logger.info("Attempt 2: Regex extraction and parse successful.")
+                        except json.JSONDecodeError as e2:
+                            logger.error(f"Attempt 2 (regex parse) failed: {e2}. Original agent output: >>>{raw_agent_output_for_error_log}<<<", exc_info=True)
+                            return json.dumps({"type": "error", "message": f"Format de réponse incorrect du styliste (après regex). Réponse brute: {raw_agent_output_for_error_log}"})
+                    else:
+                        logger.warning(f"Attempt 2 (regex search): No JSON object found. Original agent output: >>>{raw_agent_output_for_error_log}<<<")
+                        return json.dumps({"type": "error", "message": "Le styliste n'a pas retourné de format JSON détectable."})
+                
+                # Si nous arrivons ici, une des tentatives de parsing a réussi.
+                return json.dumps({
+                    "type": "style",
+                    "message": "Modifications de style CSS générées.",
+                    "style_changes": style_changes_json
+                })
+
+            elif task_type == "recherche":
+                logger.info("Déclenchement du workflow de recherche")
+                research_task = Task(
+                    description=f"Effectue une recherche approfondie et détaillée sur la requête suivante : '{message}'.",
+                    agent=self.researcher,
+                    expected_output="Un rapport de recherche complet, factuel et bien structuré."
+                )
+                analysis_task = Task(
+                    description="Analyse les informations du rapport de recherche pour en extraire les points essentiels, les tendances et les conclusions pertinentes.",
+                    agent=self.analyst,
+                    expected_output="Une synthèse analytique claire avec les principaux insights.",
+                    context=[research_task]
+                )
+                writing_task = Task(
+                    description="Rédige une réponse finale informative, claire et bien organisée, basée sur l'analyse fournie.",
+                    agent=self.writer,
+                    expected_output="Une réponse utilisateur finale, bien rédigée et complète.",
+                    context=[analysis_task]
+                )
+                
+                self.crew.tasks = [research_task, analysis_task, writing_task]
+                final_research_result = await self._run_crew() # _run_crew exécute self.crew.kickoff()
+                
+                return json.dumps({"type": "recherche", "message": final_research_result})
+            
+            else: # Ne devrait pas être atteint avec la logique actuelle
+                logger.error(f"Logique de routage interne a échoué pour le message: {message}")
+                return json.dumps({"type": "error", "message": "Erreur interne de routage de la tâche."})
+
         except Exception as e:
-            logger.error(f"Erreur de traitement: {str(e)}")
-            return f"Erreur : {str(e)}"
+            logger.error(f"Erreur globale dans process_message: {e}", exc_info=True)
+            return json.dumps({"type": "error", "message": f"Une erreur serveur inattendue est survenue: {str(e)}"})
 
     # Méthodes auxiliaires pour exécution asynchrone
     async def _run_task(self, task: Task) -> str:
